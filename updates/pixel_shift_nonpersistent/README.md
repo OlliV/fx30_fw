@@ -1,5 +1,8 @@
 # Pixel Shift Multi Shoot — non-persistent probe (FX30 6.01)
 
+> **Boot loop reported after the first camera run: see [RECOVERY.md](RECOVERY.md)
+> before doing anything else. Stop writes; do not use `--persist`.**
+
 This package prepares a **session-only** test of the FX30 Pixel Shift Multi
 Shoot path. It writes one BK4 setting byte in RAM and deliberately does not
 persist it. A cold boot is the rollback.
