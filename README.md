@@ -30,6 +30,7 @@ notes/
 updates/
   pixel_shift_nonpersistent/ payload.json, README.md, TEST_PLAN.md, RESULT.md, REMOTE_TOOL_PLAN.md
   8k_video/                  findings, property map, probe/forced-write notes
+  menu_survey/               disabled-menu-entry survey and UXC limitations
 ```
 
 `fdat.bin` and `firmware.tar` (about 860 MB each) are not kept. Regenerate them with the steps below.
@@ -244,6 +245,11 @@ entry was found beyond what the manual already exposes. The remaining
 “exciting” strings are shared code for other bodies (8K) or menu-gated
 (pixel shift). The useful next step is the remote/PTP pixel-shift path, not
 enabling another format.
+
+A deeper menu-table survey — product gating via `TYPE_MENU_ITEM_LAX`, 7,337
+shared `STRID_FUNC_*` labels, 771 `PRM_HAITA_*` availability properties, and
+the UXC-parser limitation — is in
+[updates/menu_survey/README.md](updates/menu_survey/README.md).
 
 ## Next steps
 
