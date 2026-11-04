@@ -121,13 +121,15 @@ ugrep, which parses `-i'…'` patterns differently. Use `sgrep.py` or `command g
 
 | Feature | Verdict | Evidence |
 |---|---|---|
-| Pixel shift | Possible | Full Pixel Shift Multi Shoot implementation present: `model::sequence_start_pixel_shift_multi_shoot`, `sequence_still_record::pixel_shift_multi_shoot_*`, PTP remote properties, UI strings. Disabled per product. The gate is not yet located: it is not a row in the feature-manager table, so it is probably the per-product menu catalogue (`PRM_FEATURE_MANAGER_menu_item`). Open questions: electronic-shutter-only capture, and whether IBIS is calibrated for sub-pixel steps. |
+| Pixel shift | Possible | Full Pixel Shift Multi Shoot implementation present: `model::sequence_start_pixel_shift_multi_shoot`, `sequence_still_record::pixel_shift_multi_shoot_*`, PTP remote properties, UI strings. Gating clues are now identified in strings: `PRM_setting_px_shift_multi_shoot`, `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` with enum values requiring electronic still shutter, and per-product menu type `VAL_FEATURE_MANAGER_menu_item_TYPE_MENU_ITEM_LAX`. Backup IDs (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_MR_setting_px_shift_multi_shoot`) show a persisted setting path. |
 
 ## Next steps
 
-1. Locate the pixel-shift gate in `appFw.so` (disassemble call sites of the
-   `menu_item` getter and the pixel-shift menu entries; compare against an A7R V / A1 build).
-2. Decide whether a persisted backup property could flip it, following
+1. Confirm the exact call chain in `appFw.so`: disassemble call sites of
+   `PRM_FEATURE_MANAGER_menu_item` (getter `0x183ee0c`) and
+   `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` to identify
+   where `TYPE_MENU_ITEM_LAX` suppresses pixel-shift menu exposure.
+2. Decide whether the persisted backup property route can flip behavior (`BKID_APP_setting_px_shift_multi_shoot`), following
    `leogenot/sony-a7iv-feature-research` docs `SERVICE_MODE.md` / `SHUTTER_ANGLE.md`.
 3. Only then, on a real camera: back up the settings first, test read-only, and expect warranty risk.
 
