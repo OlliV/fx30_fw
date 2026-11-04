@@ -121,7 +121,7 @@ ugrep, which parses `-i'…'` patterns differently. Use `sgrep.py` or `command g
 
 | Feature | Verdict | Evidence |
 |---|---|---|
-| Pixel shift | Possible | Full Pixel Shift Multi Shoot implementation present: `model::sequence_start_pixel_shift_multi_shoot`, `sequence_still_record::pixel_shift_multi_shoot_*`, PTP remote properties, UI strings. Gating clues are now identified in strings: `PRM_setting_px_shift_multi_shoot`, `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` with enum values requiring electronic still shutter, and per-product menu type `VAL_FEATURE_MANAGER_menu_item_TYPE_MENU_ITEM_LAX`. Backup IDs (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_MR_setting_px_shift_multi_shoot`) show a persisted setting path. |
+| Pixel shift | Possible | Full Pixel Shift Multi Shoot implementation present: `model::sequence_start_pixel_shift_multi_shoot`, `sequence_still_record::pixel_shift_multi_shoot_*`, remote setters (`set_remote_px_shift_multi_shoot_mode/number/interval`), and value enums for off/4-image/16-image modes. Gating clues in strings now include `PRM_setting_px_shift_multi_shoot`, `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` (electronic still shutter requirement), per-product menu type `VAL_FEATURE_MANAGER_menu_item_TYPE_MENU_ITEM_LAX`, and a second exclusion path `PRM_HAITA_setting_wireless_flash_wireless_function_for_flash_signal_communications_external_flash_communication_type_setting_px_shift_multi_shoot`. Backup IDs (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_MR_setting_px_shift_multi_shoot`) plus 4/16-image BKIDs show a persisted setting path. |
 
 ## Next steps
 
@@ -129,9 +129,11 @@ ugrep, which parses `-i'…'` patterns differently. Use `sgrep.py` or `command g
    `PRM_FEATURE_MANAGER_menu_item` (getter `0x183ee0c`) and
    `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` to identify
    where `TYPE_MENU_ITEM_LAX` suppresses pixel-shift menu exposure.
-2. Decide whether the persisted backup property route can flip behavior (`BKID_APP_setting_px_shift_multi_shoot`), following
+2. Trace both HAITA exclusion paths for pixel shift (`...still_shutter_type...` and
+   `...wireless_flash...setting_px_shift_multi_shoot`) and map which menu state each one blocks.
+3. Decide whether the persisted backup property route can flip behavior (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_setting_px_shift_multi_shoot_4_images_shooting`, `BKID_APP_setting_px_shift_multi_shoot_16_images_shooting`), following
    `leogenot/sony-a7iv-feature-research` docs `SERVICE_MODE.md` / `SHUTTER_ANGLE.md`.
-3. Only then, on a real camera: back up the settings first, test read-only, and expect warranty risk.
+4. Only then, on a real camera: back up the settings first, test read-only, and expect warranty risk.
 
 ## References
 
