@@ -96,6 +96,8 @@ entry. This is consistent with the `PRM_FEATURE_MANAGER_menu_item` →
   failed**: the camera synced the dirty container even without `0x603/3`.
 - The menu blocker is **menu registration / product-class gating**, not the
   value property.
+- **Pixel shift with autofocus is not usable on this body**: attempting it
+  triggers the still-image init boot loop. Do not enable it with AF.
 - Do **not** persist mode `01`. In the observed recovery, no `--persist` was
   needed: a RAM-only snapshot restore followed by battery removal/cold boot was
   sufficient. If `01` survives a cold boot, use Setting Reset or save the
