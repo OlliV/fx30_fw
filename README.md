@@ -221,6 +221,30 @@ read-only probe with an explicit `--force-unsupported` RAM-only experiment; it
 refuses `--persist`. Details:
 [updates/8k_video/README.md](updates/8k_video/README.md).
 
+### Feature survey — what is actually exposed (2026-11-04)
+
+Many feature strings in the shared app are for other bodies. The FX30 manual is
+the ground truth for what the FX30 actually exposes. Checked candidates:
+
+| Candidate | Menu/UI evidence | FX30 hardware | Verdict |
+|---|---|---|---|
+| Shutter angle | [Shutter Mode](https://helpguide.sony.net/ilc/2220/v1/en/contents/TP1001690662.html) (firmware 5.00+) | electronic shutter / frame rate | **already exposed** |
+| Breathing compensation | [Lens Compensation](https://helpguide.sony.net/ilc/2220/v1/en/contents/TP1000882810.html) | compatible E-mount lens | **already exposed** |
+| Anamorphic de-squeeze | [De-Squeeze Display](https://helpguide.sony.net/ilc/2220/v1/en/contents/TP1001106329.html) (1.3/2.0, plus 1.5/1.6 from 6.00) | display only | **already exposed** |
+| RAW output | [RAW output](https://helpguide.sony.net/ilc/2220/v1/en/contents/TP1002078215.html) | external RAW recorder | **already exposed** |
+| 240 fps S&Q | [S&Q Settings](https://helpguide.sony.net/ilc/2220/v1/en/contents/TP1000876544.html) | sensor/encoder | **already exposed** |
+| 8K XAVC HS | shared UI value + BKIDs | no (26 MP) | **not viable** |
+| Pixel shift | shared UI + BKIDs | menu-gated; crash loop | **not viable** |
+| Open gate | no strings found | unknown/absent | **not present** |
+| 4:4:4 | no strings found | unknown/absent | **not present** |
+| ND filter / mechanical shutter / flash | — | no hardware | **unavailable** |
+
+Conclusion: no additional hardware-supported feature with a proper FX30 menu
+entry was found beyond what the manual already exposes. The remaining
+“exciting” strings are shared code for other bodies (8K) or menu-gated
+(pixel shift). The useful next step is the remote/PTP pixel-shift path, not
+enabling another format.
+
 ## Next steps
 
 1. Confirm the exact call chain in `appFw.so`: disassemble call sites of
