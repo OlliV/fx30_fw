@@ -1,7 +1,7 @@
 # Sony FX30 firmware 6.01 — unpacking & feature survey
 
 Notes and tools for decrypting the official Sony FX30 (ILME-FX30) firmware update
-`BODYDATA.DAT` and looking for dormant features (BRAW, open gate, 4:4:4, pixel shift).
+`BODYDATA.DAT` and looking for dormant features (8K recording, open gate, 4:4:4, pixel shift).
 Nothing here touches a camera; it is all offline analysis of the update file.
 
 ## Layout
