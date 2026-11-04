@@ -15,7 +15,9 @@ tools/
   fx30_service_probe.py      USB service-mode read-only probe (MSC 0E0E -> service 0336 + HASP)
   fx30_burst.py              hidden burst-mode toggle/rollback helper for BK4 settings container
   fx30_pixel_shift.py        session-only pixel-shift BK4 probe (0x603/4, no save)
+  fx30_8k.py                  XAVC HS 8K probe / forced RAM-only experiment
   test_pixel_shift_offline.py  synthetic + real-profile tests for the probe
+  test_8k_offline.py         offline 8K file-format patch tests
   setup_service_deps.sh      fetch transport/pmca into deps/ and install pyusb
 extracted/
   firmware_tar/              contents of firmware.tar
@@ -27,6 +29,7 @@ notes/
                              build by leogenot/sony-a7iv-feature-research (for comparison)
 updates/
   pixel_shift_nonpersistent/ payload.json, README.md, TEST_PLAN.md, RESULT.md, REMOTE_TOOL_PLAN.md
+  8k_video/                  findings, property map, probe/forced-write notes
 ```
 
 `fdat.bin` and `firmware.tar` (about 860 MB each) are not kept. Regenerate them with the steps below.
@@ -143,6 +146,7 @@ ugrep, which parses `-i'…'` patterns differently. Use `sgrep.py` or `command g
 |---|---|---|
 | Pixel shift | Implementation present; menu-gated | Full Pixel Shift Multi Shoot implementation present: `model::sequence_start_pixel_shift_multi_shoot`, `sequence_still_record::pixel_shift_multi_shoot_*`, remote setters (`set_remote_px_shift_multi_shoot_mode/number/interval`), and value enums for off/4-image/16-image modes. Gating clues in strings now include `PRM_setting_px_shift_multi_shoot`, `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` (electronic still shutter requirement), per-product menu type `VAL_FEATURE_MANAGER_menu_item_TYPE_MENU_ITEM_LAX`, and a second exclusion path `PRM_HAITA_setting_wireless_flash_wireless_function_for_flash_signal_communications_external_flash_communication_type_setting_px_shift_multi_shoot`. Backup IDs (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_MR_setting_px_shift_multi_shoot`) plus 4/16-image BKIDs show a persisted setting path. On-camera result: the Drive Mode menu did not expose it; writing the 4-image value caused a still-image init boot loop (next row). |
 | Pixel shift + autofocus | **Not possible / crash loop** | Attempting pixel shift on the FX30 led to a boot loop: photo mode → IBIS/sensor clunk → black screen → reboot, with a brief “Pixel Shift Multi Shoot is not available” modal. It reproduced without a lens, and the Drive Mode menu never showed a pixel-shift entry. Recovery: RAM-only snapshot restore followed by battery removal/cold boot; `--persist` was **not** needed. Do not enable pixel shift with AF on this body. |
+| 8K video (XAVC HS 8K) | **Not viable on FX30** | Shared app has the full XAVC HS 8K format path and BKID properties (`0x02cf01f7` file_format=5, `0x02cf01f9` frame rate, `0x02cf0205/207` record settings, SQ variants `0x02cf0233/241/243`). All 11 LAX profiles contain them, but `file_format` defaults to `0x08` (XAVC S HD), and the 26.1 MP IMX684 cannot produce native 8K UHD (~33.2 MP). Probe with `tools/fx30_8k.py`; do not persist. See `updates/8k_video/README.md`. |
 
 ## Merged findings and tools from Lincan research (translated)
 
@@ -201,6 +205,21 @@ it is `01`, clear it with Setting Reset or a saved snapshot. See
 [RESULT.md](updates/pixel_shift_nonpersistent/RESULT.md). The design and build
 plan for the remote/PTP path is in
 [REMOTE_TOOL_PLAN.md](updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md).
+
+### 8K video (XAVC HS 8K) — investigated, not viable
+
+The shared app has the complete XAVC HS 8K format path and BKID properties:
+`0x02cf01f7` (`file_format`, `5` = XAVC HS 8K), `0x02cf01f9` (8K frame rate),
+`0x02cf0205`/`0x02cf0207` (8K record settings), plus SQ variants. All 11 LAX
+profiles contain them, but `file_format` defaults to `0x08` (XAVC S HD). The
+shared UI has the `STRID_FUNC_MOVIE_FORMAT_SET_XAVCHS_8K` Movie Format value
+and its guide, but there is no separate top-level `STRID_MENU_*8K*` item; 8K is
+a value of the Movie/File Format menu, not an independent mode. The FX30/LAX
+menu does not expose it. The 26.1 MP IMX684 cannot produce native 8K UHD
+(~33.2 MP); this is shared code for 8K-capable bodies. `tools/fx30_8k.py` is a
+read-only probe with an explicit `--force-unsupported` RAM-only experiment; it
+refuses `--persist`. Details:
+[updates/8k_video/README.md](updates/8k_video/README.md).
 
 ## Next steps
 
