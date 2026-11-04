@@ -102,7 +102,54 @@ camera reboots during the service handshake, it will not work; stop.
 A full service handshake normally takes tens of seconds, so this only works if
 the boot window is longer than usual. Do not blind-write during a reboot.
 
-### 0.6 Official reflash / service
+### 0.6 If the scan shows 054C:0D68 or 054C:096F
+
+These are intermediate Sony USB identities seen during normal-side
+re-authentication after service mode (`deps/transport.py:260`: 0D68 -> 096F ->
+MSC again). They are **not** an update mode. The official updater PIDs are
+`0x033a` / `0x03e2`; do not flash based on `0x0D68`.
+
+A `0x0D68` scan usually shows a HID interface (class `03/00/00`, one interrupt
+IN endpoint, 8-byte reports). That is consistent with the auth-transition HID,
+not PTP/MSC and not the updater.
+
+- Leave USB connected and wait 30–60 s without replugging; the camera may
+  re-enumerate as `0x0E0E` (possibly via `0x096F`).
+- Run `--scan` again. If `0x0E0E` appears, run read-only `--probe`.
+- If it stays at `0x0D68`/`0x096F`, you can try the low-level `StopSenser`
+  request, which is the same vendor request `SonySenserAuthDevice.stop()` uses.
+  It does not authenticate, read/write BK4, or touch firmware:
+
+  ```bash
+  sudo -E ./venv/bin/python tools/fx30_usb_recover.py --stop-senser --retries 5 --delay 2
+  ```
+
+  A `Pipe error` can be transient while the camera is mid-boot or re-enumerating;
+  the retry loop re-finds the device each attempt. If every attempt stalls, the
+  HID interface does not accept `StopSenser`, and more retries will not help.
+  Then try a USB port reset once:
+
+  ```bash
+  sudo -E ./venv/bin/python tools/fx30_usb_recover.py --reset
+  ```
+
+  Then `--scan` again. If `0x0E0E` appears, stop and run read-only `--probe`.
+  If not, the service window is not available; use the official service route.
+  Do not flash based on `0x0D68`.
+
+### 0.6.1 USB recovery result (2026-11-04)
+
+- The `0x0D68` HID device appears only intermittently: attempts 1–3 found no
+  Sony device, attempts 4–5 found `0x0D68`, and the final scan found none. That
+  is consistent with the camera rebooting through the USB stack each cycle.
+- `StopSenser` returned `Pipe error` on every attempt (five retries, 2 s apart).
+  The HID interface does not accept that request; this is not a transient
+  one-off.
+- Conclusion: the USB/auth path is exhausted. Do not keep retrying `StopSenser`
+  or USB resets. The remaining failure is the app-level boot loop, and the
+  practical recovery is a Sony service settings reset/reflash.
+
+### 0.7 Official reflash / service
 
 If none of the above reaches the reset menu, use Sony's official firmware
 recovery/service route (section 3A/3C). A settings reset is preferable; a
@@ -112,7 +159,7 @@ Do **not** start a firmware update while the camera is rebooting unless Sony's
 official recovery procedure explicitly supports it. An interrupted update is
 worse than the current boot loop.
 
-### 0.7 If playback is unreachable
+### 0.8 If playback is unreachable
 
 If the camera cannot be held in playback or in the menu, the last safe DIY
 attempt is a **read-only** service catch. Start the probe first, then power the

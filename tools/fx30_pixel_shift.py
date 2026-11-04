@@ -570,11 +570,27 @@ def do_scan() -> int:
               % (d.idVendor, d.idProduct, man[:22], prod[:30], ser[:20]))
         if d.idVendor == 0x054C:
             sony.append(d)
+            try:
+                for cfg in d:
+                    for itf in cfg:
+                        print("      cfg %d if %d alt %d class=%02x/%02x/%02x eps=%d"
+                              % (cfg.bConfigurationValue, itf.bInterfaceNumber,
+                                 itf.bAlternateSetting, itf.bInterfaceClass,
+                                 itf.bInterfaceSubClass, itf.bInterfaceProtocol,
+                                 itf.bNumEndpoints))
+            except Exception as exc:
+                print("      descriptors: %r" % (exc,))
 
     if any(d.idProduct == 0x0E0E for d in sony):
         print("\n  054C:0E0E (MSC) is present.")
         print("  If the tool still fails, close Photos/Image Capture/Imaging Edge,")
         print("  unmount any FX30 volume, and retry.")
+    elif any(d.idProduct in (0x0D68, 0x096F) for d in sony):
+        print("\n  054C:0D68 / 054C:096F are intermediate Sony identities seen")
+        print("  during normal-side re-authentication after service mode, not an")
+        print("  update mode. Do not flash based on this PID.")
+        print("  Leave USB connected and wait 30-60 s without replugging; the")
+        print("  camera may re-enumerate as 054C:0E0E. Then retry --scan/--probe.")
     elif sony:
         print("\n  Sony device(s) found, but none is 054C:0E0E (MSC).")
         print("  The camera is in another USB mode (PC Remote / Streaming / Auto).")
