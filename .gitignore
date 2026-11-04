@@ -1,2 +1,9 @@
 /extracted
 /fx30_dump
+/deps
+/venv
+__pycache__/
+*.pyc
+/fdat.bin
+/firmware.tar
+BODYDATA.DAT

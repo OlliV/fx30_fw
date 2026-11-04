@@ -1,0 +1,15 @@
+{
+  "name": "fx30-pixel-shift-4-images-nonpersistent",
+  "description": "Session-only BK4 write of the FX30 Pixel Shift Multi Shoot mode. No 0x603/3 save is sent; a cold boot restores the previous value.",
+  "persist": false,
+  "properties": [
+    {
+      "id": "0x02cf02ca",
+      "role": "mode",
+      "value": 1,
+      "required": true,
+      "mr_twin": false,
+      "note": "BKID_APP_setting_px_shift_multi_shoot: 0=off, 1=4 images, 2=16 images. 1-byte live property; attr 0x60 in the LAX profiles."
+    }
+  ]
+}

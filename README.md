@@ -14,6 +14,9 @@ tools/
   sgrep.py                   regex search over printable strings in a file or tree
   fx30_service_probe.py      USB service-mode read-only probe (MSC 0E0E -> service 0336 + HASP)
   fx30_burst.py              hidden burst-mode toggle/rollback helper for BK4 settings container
+  fx30_pixel_shift.py        session-only pixel-shift BK4 probe (0x603/4, no save)
+  test_pixel_shift_offline.py  synthetic + real-profile tests for the probe
+  setup_service_deps.sh      fetch transport/pmca into deps/ and install pyusb
 extracted/
   firmware_tar/              contents of firmware.tar
   nflasha15_usr/             /usr  (ext4) — lib/appFw.so is the main camera app
@@ -22,6 +25,8 @@ notes/
   appFw_strings.txt          `strings -n 6` of appFw.so
   feature-manager-a7iv-602.json   per-product feature table decoded from the A7 IV 6.02
                              build by leogenot/sony-a7iv-feature-research (for comparison)
+updates/
+  pixel_shift_nonpersistent/ payload.json, README.md, TEST_PLAN.md for the session-only probe
 ```
 
 `fdat.bin` and `firmware.tar` (about 860 MB each) are not kept. Regenerate them with the steps below.
@@ -41,6 +46,19 @@ python3 -m venv venv
 ```bash
 brew install e2fsprogs
 ```
+
+For the service-channel tools (`fx30_service_probe.py`, `fx30_burst.py`,
+`fx30_pixel_shift.py`), run the dependency setup once:
+
+```bash
+./tools/setup_service_deps.sh
+```
+
+It sparse-clones the Sony runtime (`transport.py`, `core.py`, `vendor/pmca`)
+into the gitignored `deps/` directory and installs `pyusb`/`libusb-package` into
+`venv`. Without it the tools fail at `ModuleNotFoundError: No module named 'usb'`.
+Use `./venv/bin/python` for those tools; bare `python3` may be a different
+interpreter without the packages.
 
 ### 1. Decrypt the update
 
@@ -143,6 +161,28 @@ are now merged into this repository as local tools:
 * `fx30_burst.py` performs writes to the settings container (BK4), **not** firmware partitions; follow the script safeguards and always keep snapshots for rollback.
 * After any BK4 write test, do a full cold restart (disconnect USB and remove battery briefly) before evaluating camera behavior.
 
+## Prepared non-persistent pixel-shift probe
+
+`tools/fx30_pixel_shift.py` implements the session-only probe from next step 3.
+It reads the live BK4 container, patches the 1-byte
+`BKID_APP_setting_px_shift_multi_shoot` property (`0x02cf02ca`: `00` off,
+`01` 4 images, `02` 16 images), recomputes the bank checksum, and writes with
+`0x603/4`. It deliberately does **not** send `0x603/3` (`save`), so the change
+is RAM-only and a cold boot reverts it.
+
+Validated offline against all 11 `0110_backup/SYSIPSX-DSLR/LAX/*.bin` profiles:
+the property is 1 byte, attr `0x60`, default `00`, and a `00`→`01` patch changes
+only the property byte plus the checksum. The FX30 defaults are already
+`still_shutter_type` = electronic (`0x02cf02d4` = `01`) and
+`wireless_flash` = off (`0x02cf0356` = `00`), so the probe leaves both alone.
+The `BKID_APP_MR_*` mirrors are 4-byte arrays, not single settings, and are also
+left untouched. Run `python3 tools/test_pixel_shift_offline.py` for the
+synthetic + real-profile regression tests.
+
+Usage, evidence, limits and the camera checklist:
+[updates/pixel_shift_nonpersistent/README.md](updates/pixel_shift_nonpersistent/README.md)
+and [updates/pixel_shift_nonpersistent/TEST_PLAN.md](updates/pixel_shift_nonpersistent/TEST_PLAN.md).
+
 ## Next steps
 
 1. Confirm the exact call chain in `appFw.so`: disassemble call sites of
@@ -151,8 +191,11 @@ are now merged into this repository as local tools:
    where `TYPE_MENU_ITEM_LAX` suppresses pixel-shift menu exposure.
 2. Trace both HAITA exclusion paths for pixel shift (`...still_shutter_type...` and
    `...wireless_flash...setting_px_shift_multi_shoot`) and map which menu state each one blocks.
-3. Implement a **non-persistent first** probe in service mode: test a session-only
-   update path for pixel-shift-related settings and verify behavior reverts after a reboot.
+3. ~~Implement a **non-persistent first** probe in service mode: test a session-only
+   update path for pixel-shift-related settings and verify behavior reverts after a reboot.~~
+   Implemented as `tools/fx30_pixel_shift.py`; the remaining work is the camera
+   run in [updates/pixel_shift_nonpersistent/TEST_PLAN.md](updates/pixel_shift_nonpersistent/TEST_PLAN.md)
+   (does the menu appear, does a 4/16-shot sequence run, does a cold boot revert?).
 4. Only if the non-persistent path is understood, evaluate the persisted backup
    property route (`BKID_APP_setting_px_shift_multi_shoot`,
    `BKID_APP_setting_px_shift_multi_shoot_4_images_shooting`,
