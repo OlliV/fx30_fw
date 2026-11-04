@@ -131,9 +131,14 @@ ugrep, which parses `-i'…'` patterns differently. Use `sgrep.py` or `command g
    where `TYPE_MENU_ITEM_LAX` suppresses pixel-shift menu exposure.
 2. Trace both HAITA exclusion paths for pixel shift (`...still_shutter_type...` and
    `...wireless_flash...setting_px_shift_multi_shoot`) and map which menu state each one blocks.
-3. Decide whether the persisted backup property route can flip behavior (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_setting_px_shift_multi_shoot_4_images_shooting`, `BKID_APP_setting_px_shift_multi_shoot_16_images_shooting`), following
+3. Implement a **non-persistent first** probe in service mode: test a session-only
+   update path for pixel-shift-related settings and verify behavior reverts after a reboot.
+4. Only if the non-persistent path is understood, evaluate the persisted backup
+   property route (`BKID_APP_setting_px_shift_multi_shoot`,
+   `BKID_APP_setting_px_shift_multi_shoot_4_images_shooting`,
+   `BKID_APP_setting_px_shift_multi_shoot_16_images_shooting`), following
    `leogenot/sony-a7iv-feature-research` docs `SERVICE_MODE.md` / `SHUTTER_ANGLE.md`.
-4. Only then, on a real camera: back up the settings first, test read-only, and expect warranty risk.
+5. Only then, on a real camera: back up the settings first, test read-only, and expect warranty risk.
 
 ## References
 
