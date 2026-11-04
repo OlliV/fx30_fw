@@ -12,6 +12,8 @@ tools/
   decrypt_fdat.py            UFU -> decrypted FDAT (UDTRFIRM) image
   fdat_to_tar.py             decrypted FDAT -> firmware.tar
   sgrep.py                   regex search over printable strings in a file or tree
+  fx30_service_probe.py      USB service-mode read-only probe (MSC 0E0E -> service 0336 + HASP)
+  fx30_burst.py              hidden burst-mode toggle/rollback helper for BK4 settings container
 extracted/
   firmware_tar/              contents of firmware.tar
   nflasha15_usr/             /usr  (ext4) — lib/appFw.so is the main camera app
@@ -122,6 +124,24 @@ ugrep, which parses `-i'…'` patterns differently. Use `sgrep.py` or `command g
 | Feature | Verdict | Evidence |
 |---|---|---|
 | Pixel shift | Possible | Full Pixel Shift Multi Shoot implementation present: `model::sequence_start_pixel_shift_multi_shoot`, `sequence_still_record::pixel_shift_multi_shoot_*`, remote setters (`set_remote_px_shift_multi_shoot_mode/number/interval`), and value enums for off/4-image/16-image modes. Gating clues in strings now include `PRM_setting_px_shift_multi_shoot`, `PRM_HAITA_setting_still_shutter_type_setting_px_shift_multi_shoot` (electronic still shutter requirement), per-product menu type `VAL_FEATURE_MANAGER_menu_item_TYPE_MENU_ITEM_LAX`, and a second exclusion path `PRM_HAITA_setting_wireless_flash_wireless_function_for_flash_signal_communications_external_flash_communication_type_setting_px_shift_multi_shoot`. Backup IDs (`BKID_APP_setting_px_shift_multi_shoot`, `BKID_APP_MR_setting_px_shift_multi_shoot`) plus 4/16-image BKIDs show a persisted setting path. |
+
+## Merged findings and tools from Lincan research (translated)
+
+The following practical findings from
+[Lincan19540/fx30-firmware-research](https://github.com/Lincan19540/fx30-firmware-research)
+are now merged into this repository as local tools:
+
+| Item | Summary | Local tool |
+|---|---|---|
+| Service-mode connection chain | Confirmed host-side flow from FX30 MSC identity (`054C:0E0E`) to Sony service identity (`054C:0336`), including Senser auth and HASP token read (expected length: 88 bytes). | `tools/fx30_service_probe.py` |
+| Hidden burst mode toggle + rollback | Verified approach to write a paired two-byte BK4 setting change, recalculate bank checksum, validate readback, and rollback to single-shot mode. | `tools/fx30_burst.py` |
+
+### Safety notes for the merged tools
+
+* Both scripts are for research only and assume your own legal/risk review.
+* `fx30_service_probe.py` is intended as read-only service-channel probing.
+* `fx30_burst.py` performs writes to the settings container (BK4), **not** firmware partitions; follow the script safeguards and always keep snapshots for rollback.
+* After any BK4 write test, do a full cold restart (disconnect USB and remove battery briefly) before evaluating camera behavior.
 
 ## Next steps
 
