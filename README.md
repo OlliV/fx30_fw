@@ -26,7 +26,7 @@ notes/
   feature-manager-a7iv-602.json   per-product feature table decoded from the A7 IV 6.02
                              build by leogenot/sony-a7iv-feature-research (for comparison)
 updates/
-  pixel_shift_nonpersistent/ payload.json, README.md, TEST_PLAN.md for the session-only probe
+  pixel_shift_nonpersistent/ payload.json, README.md, TEST_PLAN.md, RESULT.md, REMOTE_TOOL_PLAN.md
 ```
 
 `fdat.bin` and `firmware.tar` (about 860 MB each) are not kept. Regenerate them with the steps below.
@@ -183,6 +183,13 @@ Usage, evidence, limits and the camera checklist:
 [updates/pixel_shift_nonpersistent/README.md](updates/pixel_shift_nonpersistent/README.md)
 and [updates/pixel_shift_nonpersistent/TEST_PLAN.md](updates/pixel_shift_nonpersistent/TEST_PLAN.md).
 
+First camera run (2026-11-04): the one-byte RAM write and readback succeeded, but
+the Drive Mode menu did not change. The drive-mode enum has no pixel-shift value;
+the property is the setting value, not the menu registration. See
+[updates/pixel_shift_nonpersistent/RESULT.md](updates/pixel_shift_nonpersistent/RESULT.md).
+Do not persist the byte. The design and build plan for the remote/PTP path is in
+[updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md](updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md).
+
 ## Next steps
 
 1. Confirm the exact call chain in `appFw.so`: disassemble call sites of
@@ -193,15 +200,17 @@ and [updates/pixel_shift_nonpersistent/TEST_PLAN.md](updates/pixel_shift_nonpers
    `...wireless_flash...setting_px_shift_multi_shoot`) and map which menu state each one blocks.
 3. ~~Implement a **non-persistent first** probe in service mode: test a session-only
    update path for pixel-shift-related settings and verify behavior reverts after a reboot.~~
-   Implemented as `tools/fx30_pixel_shift.py`; the remaining work is the camera
-   run in [updates/pixel_shift_nonpersistent/TEST_PLAN.md](updates/pixel_shift_nonpersistent/TEST_PLAN.md)
-   (does the menu appear, does a 4/16-shot sequence run, does a cold boot revert?).
-4. Only if the non-persistent path is understood, evaluate the persisted backup
-   property route (`BKID_APP_setting_px_shift_multi_shoot`,
-   `BKID_APP_setting_px_shift_multi_shoot_4_images_shooting`,
-   `BKID_APP_setting_px_shift_multi_shoot_16_images_shooting`), following
-   `leogenot/sony-a7iv-feature-research` docs `SERVICE_MODE.md` / `SHUTTER_ANGLE.md`.
-5. Only then, on a real camera: back up the settings first, test read-only, and expect warranty risk.
+   Implemented as `tools/fx30_pixel_shift.py` and run on the camera: the one-byte
+   RAM write and readback succeeded, but the Drive Mode menu did not change. See
+   [RESULT.md](updates/pixel_shift_nonpersistent/RESULT.md).
+4. Do **not** persist `0x02cf02ca`: it is the pixel-shift value, not the menu
+   registration. The drive-mode enum has no pixel-shift entry.
+5. Build the remote/PTP tool described in
+   [REMOTE_TOOL_PLAN.md](updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md):
+   read-only code/property enumeration first, then set mode / test mode, then
+   start/cancel and event capture.
+6. Only if the remote path is understood, consider persisted settings or other
+   changes; back up first and expect warranty risk.
 
 ## References
 

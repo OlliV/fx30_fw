@@ -9,6 +9,12 @@ the product-class (`TYPE_MENU_ITEM_LAX`) gating that can hide the menu entry, so
 the first question is whether changing the live setting has any visible effect
 at all.
 
+**First camera result (2026-11-04):** the non-persistent write worked and
+readback verified, but the Drive Mode menu did **not** change. The drive-mode
+enum has no pixel-shift value, so this byte is the setting value, not the menu
+registration. See [RESULT.md](RESULT.md) before running another test; do not
+persist the byte.
+
 ## What changes
 
 Exactly one 1-byte BK4 property, plus the bank checksum:
@@ -188,7 +194,8 @@ interval bytes alone.
   for an ID; `--extra ID=VAL --allow-unknown` can test that ID explicitly.
 * If the setting alone produces no visible change, the next experiment is the
   runtime test-shooting/remote path (PTP or the HAITA-style command interface),
-  not a persistent BK4 edit.
+  not a persistent BK4 edit. The design and build steps for that remote tool are
+  in [REMOTE_TOOL_PLAN.md](REMOTE_TOOL_PLAN.md).
 
 ## Safety
 
