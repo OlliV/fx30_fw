@@ -1,7 +1,9 @@
 # Camera test plan — FX30 Pixel Shift Multi Shoot (session-only)
 
 One change per session. Record everything; a negative result is still a result.
-The write is **not** saved, so a cold boot must bring the original value back.
+The tool does **not** send `0x603/3` by default, but the camera may still sync
+the dirty container on shutdown/reboot. Do **not** use a cold boot as the first
+rollback; restore the snapshot first (see section 3).
 
 ## Preconditions
 
@@ -64,20 +66,34 @@ Record:
 | Any error message / beep / freeze | |
 | Camera temperature / unusual behaviour | |
 
-## 3. Cold-boot revert
+## 3. Rollback — restore, then cold boot
 
-1. [ ] Power off, disconnect USB.
-2. [ ] Remove the battery for at least 30 s.
-3. [ ] Reinsert, power on, reconnect USB in MSC.
-4. [ ] Run `--probe` again.
+Do **not** cold-boot the experimental value. The camera can sync the dirty BK4
+container on shutdown/reboot even without an explicit save.
+
+1. [ ] Restore the pre-write snapshot in RAM:
+
+   ```bash
+   sudo -E ./venv/bin/python tools/fx30_pixel_shift.py \
+     --restore fx30_dump/pixel_shift_snapshot_XXXX.bin
+   ```
+
+2. [ ] **Cold boot**: power off, disconnect USB, remove the battery for at least
+   30 s, reinsert, power on.
+
+   In the observed 2026-11-04 recovery, this was sufficient and `--persist` was
+   **not** used or needed.
+
+3. [ ] Reconnect USB in MSC and run `--probe` again.
 
 - [ ] `0x02cf02ca` is back to `0x00`.
 - [ ] The Drive Mode menu no longer shows Pixel Shift Multi Shoot.
 - [ ] A normal single shot still works.
 
-If the value or the behaviour survives the cold boot, **stop**. That means the
-write was not session-only on this firmware; record it and do not repeat until
-the persistence path is understood.
+If the value or the behaviour survives as `01`, use **Setting Reset → Camera
+Settings Reset** or save the restored snapshot with `--persist --yes`, then cold
+boot again. Record the result and do not repeat until the persistence path is
+understood.
 
 ## 4. Optional 16-image run
 
@@ -93,28 +109,33 @@ battery and heat.
 
 ## 5. Rollback / cleanup
 
-- Normal rollback: cold boot (section 3).
+- Normal rollback: restore the snapshot, then cold boot (section 3). In the
+  observed recovery, `--persist` was not needed.
 - Immediate rollback without a reboot:
 
 ```bash
-sudo -E PYTHONPATH="$FX30_DEPS:$FX30_DEPS/vendor" \
-  python3 tools/fx30_pixel_shift.py --restore fx30_dump/pixel_shift_snapshot_XXXX.bin
+sudo -E ./venv/bin/python tools/fx30_pixel_shift.py \
+  --restore fx30_dump/pixel_shift_snapshot_XXXX.bin
 ```
 
-- Persistent rollback (only if you deliberately used `--persist`):
-  add `--persist --yes` to the restore command, then cold-boot and verify.
+- Only if `01` survives the cold boot, use **Setting Reset → Camera Settings
+  Reset** or add `--persist --yes` to the restore command. Do not persist mode
+  `01`.
 
 ## Abort criteria
 
-Stop immediately and cold-boot if any of these happen:
+Stop immediately if any of these happen:
 
 - write rejected (`res=129`) or readback mismatch;
 - camera freezes, reboots, or drops USB during/after the write;
 - menu or settings look corrupted;
 - unexpected heat, noise, or repeated actuator movement;
-- the changed value survives a cold boot (persistence surprise).
+- the changed value survives as `01` after a reboot (persistence surprise).
 
-Do not “try one more byte” in the same session. Revert, cold-boot, and reassess.
+Do not hard-reboot with the experimental value active. If service mode is
+reachable, restore the snapshot, then cold boot; in the observed recovery,
+`--persist` was not needed. If `01` survives, use Setting Reset or save the
+restored snapshot. Do not “try one more byte” in the same session.
 
 ## Session log
 

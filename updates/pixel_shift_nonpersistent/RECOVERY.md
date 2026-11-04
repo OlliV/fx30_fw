@@ -1,16 +1,95 @@
 # Boot-loop recovery — FX30 after the pixel-shift RAM write
 
-Status: urgent recovery note, 2026-11-04
+Status: recovered on 2026-11-04; recovery method documented below
 Context: the BK4 write was verified in RAM and no `0x603/3` save was sent, but the
-camera is now reported to be in a boot loop.
+camera went into a boot loop.
+
+## Resolution: OSS lens + Movie mode (2026-11-04)
+
+The camera was recovered **without a settings reset** by using a lens with
+optical image stabilization to slow the boot just enough to switch the camera
+to **Movie mode** before the still-image initialization crashed it.
+
+Likely mechanism: the boot loop is in the still-image/pixel-shift sensor
+initialization. Movie mode does not run that still-image path, so the camera
+stays up. The OSS lens lengthens lens/IBIS initialization enough to give you a
+window to press **MODE** and switch to Movie.
+
+**2026-11-04 detail:** the successful recovery used a **RAM-only** `--restore`
+followed by **battery removal / cold boot**. `--persist` was **not used and was
+not necessary**. The battery removal erased the RAM copy, so the exact mechanism
+is not fully proven: the camera may have synced the restored `00` itself, or the
+cold boot cleared a transient warm-boot state. Verify `0x02cf02ca = 00`; only if
+it is still `01` after a cold boot should you use Setting Reset or a saved
+snapshot.
+
+### If this happens again
+
+1. Attach a lens with **optical image stabilization** (OSS/SteadyShot).
+2. Power on.
+3. As soon as the UI appears, press **MODE** and switch to **Movie**.
+4. Stay in Movie mode. Do **not** switch to Photo until the pixel-shift value is
+   cleared.
+5. Verify/clear the setting:
+   - Run a read-only `--probe`; `0x02cf02ca = 00` is safe. If it is still `01`
+     after a cold boot, use **MENU → Setup → Reset/Save Settings → Setting
+     Reset → Camera Settings Reset** (or **Initialize** if needed).
+6. **Cold boot** into Photo mode (battery out for at least 30 s), not a normal
+   restart, and verify.
+
+### Warm reboot vs cold boot (2026-11-04)
+
+After the fix, a **warm reboot** brought the loop back; removing the battery
+(**cold boot**) cleared it. The FX30 has a warm-boot image (`nflasha5`), so a
+warm reboot can restore a pre-fix state.
+
+After clearing the pixel-shift value, do a full **cold boot** (battery out for
+at least 30 s), not a normal restart. If a warm reboot still loops while a
+read-only `--probe` shows `0x02cf02ca = 00`, the warm-boot image likely needs a
+service reflash; use cold boots until that is done.
+
+### Caveats
+
+- This is a **timing workaround**, not proof that the persisted value is gone.
+  Movie mode ducks the still-image init; Photo mode can loop again if
+  `0x02cf02ca` is still `01`.
+- A **Setting Reset** is optional cleanup, needed only if `01` survives a cold
+  boot or if Photo mode loops.
+- In the observed recovery, `--persist` was **not** needed: a RAM-only restore
+  followed by battery removal/cold boot was sufficient.
+- Do not persist the experimental mode. If you need to write again, write the
+  known-good pre-write snapshot (`00`), not mode `01`.
+- The OSS lens is not a permanent fix; it only widens the boot window.
+
+### How to verify the current state
+
+Read-only, if service mode is reachable:
+
+```bash
+sudo -E ./venv/bin/python tools/fx30_pixel_shift.py --probe
+```
+
+- `0x02cf02ca = 00` → the live container is clean; Photo mode should be safe.
+  In the observed recovery, no `--persist` was needed.
+- `0x02cf02ca = 01` → do not switch to Photo until you clear it (Setting Reset
+  or a saved snapshot restore).
+
+This reads the live container. After the 2026-11-04 battery removal it reflects
+the persisted state. In the observed recovery, a RAM-only restore plus the
+battery removal/cold boot was sufficient; `--persist` was not used and was not
+necessary. If `01` survives a cold boot, then use Setting Reset or a saved
+snapshot.
 
 ## First: stop
 
 - Do **not** run `--apply` again.
-- Do **not** run `--persist`.
-- Do **not** run `--restore` unless the camera is stable in service mode and you
-  have read the state first (see below).
-- Do not repeatedly power-cycle. Give the camera a rest between attempts.
+- Do **not** persist mode `01`.
+- If the camera is stable in service mode, restore the **pre-write snapshot**,
+  then **cold boot** (battery out for at least 30 s). In the observed recovery,
+  `--persist` was not needed. Only if `01` survives the cold boot should you use
+  Setting Reset or save the restored snapshot.
+- Do not repeatedly power-cycle. A hard reboot can persist the experimental
+  state; restore the snapshot before rebooting.
 - Do not open the camera or edit `BODYDATA.DAT`.
 
 ## 0. If it reaches photo mode, IBIS moves, then reboots

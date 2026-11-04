@@ -167,8 +167,13 @@ are now merged into this repository as local tools:
 It reads the live BK4 container, patches the 1-byte
 `BKID_APP_setting_px_shift_multi_shoot` property (`0x02cf02ca`: `00` off,
 `01` 4 images, `02` 16 images), recomputes the bank checksum, and writes with
-`0x603/4`. It deliberately does **not** send `0x603/3` (`save`), so the change
-is RAM-only and a cold boot reverts it.
+`0x603/4`. It does **not** send `0x603/3` (`save`) by default, but that did
+**not** prove non-persistence on this body: the camera later synced the dirty
+container, and the value survived a power-off. A hard reboot can persist an
+experimental value; restore the pre-write snapshot first and, if stable, save
+the restored known-good state before rebooting. See
+[RESULT.md](updates/pixel_shift_nonpersistent/RESULT.md) and
+[RECOVERY.md](updates/pixel_shift_nonpersistent/RECOVERY.md).
 
 Validated offline against all 11 `0110_backup/SYSIPSX-DSLR/LAX/*.bin` profiles:
 the property is 1 byte, attr `0x60`, default `00`, and a `00`→`01` patch changes
@@ -185,10 +190,16 @@ and [updates/pixel_shift_nonpersistent/TEST_PLAN.md](updates/pixel_shift_nonpers
 
 First camera run (2026-11-04): the one-byte RAM write and readback succeeded, but
 the Drive Mode menu did not change. The drive-mode enum has no pixel-shift value;
-the property is the setting value, not the menu registration. See
-[updates/pixel_shift_nonpersistent/RESULT.md](updates/pixel_shift_nonpersistent/RESULT.md).
-Do not persist the byte. The design and build plan for the remote/PTP path is in
-[updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md](updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md).
+the property is the setting value, not the menu registration. The camera then
+boot-looped in Photo mode after a power-off. A **RAM-only snapshot restore**
+followed by **battery removal / cold boot** cleared the loop; `--persist` was
+not used and was not necessary. The camera is usable in Movie mode (an OSS lens
+widens the boot window). Verify `0x02cf02ca = 00` before switching to Photo; if
+it is `01`, clear it with Setting Reset or a saved snapshot. See
+[RECOVERY.md](updates/pixel_shift_nonpersistent/RECOVERY.md) and
+[RESULT.md](updates/pixel_shift_nonpersistent/RESULT.md). The design and build
+plan for the remote/PTP path is in
+[REMOTE_TOOL_PLAN.md](updates/pixel_shift_nonpersistent/REMOTE_TOOL_PLAN.md).
 
 ## Next steps
 

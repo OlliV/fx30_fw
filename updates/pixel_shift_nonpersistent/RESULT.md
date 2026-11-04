@@ -1,11 +1,30 @@
 # Result: session-only mode write succeeded, menu unchanged
 
-> **Boot loop reported after this test: see [RECOVERY.md](RECOVERY.md) first.**
-> Stop further writes and do not use `--persist`.
+> **Recovered on 2026-11-04 without a settings reset:** attaching an OSS lens
+> slowed the boot enough to switch to Movie mode, which does not run the
+> still-image/pixel-shift path. See [RECOVERY.md](RECOVERY.md) for the method
+> and the caveat that the persisted value still needs verification.
 
 Date: 2026-11-04
 Camera: ILME-FX30, firmware 6.01 (`31182_15.2025122501`)
 Mode: service channel, BK4 write in RAM only (no `0x603/3` save)
+
+## Recovery
+
+The camera boot-looped in Photo mode after the write and a normal power-off.
+Attempts to reset via the menu failed because the camera rebooted immediately.
+A RAM-only `--restore` was written; **`--persist` was not used**. A later
+battery removal / cold boot cleared the loop. The camera was then usable by:
+
+1. Attaching a lens with optical image stabilization (OSS).
+2. Powering on; the OSS lens lengthened the boot window.
+3. Switching to **Movie** mode before the still-image initialization crashed.
+4. Movie mode stayed up; no settings reset was needed for the camera to work.
+
+No `--persist` was needed for this recovery. The exact mechanism is not fully
+proven: the camera may have synced the restored `00` itself, or the cold boot
+cleared the warm-boot state. Verify with a read-only `--probe`; if
+`0x02cf02ca` is still `01`, clear it before switching back to Photo mode.
 
 ## What was run
 
@@ -35,6 +54,25 @@ The Drive Mode menu still exposed only:
 
 No Pixel Shift Multi Shoot entry appeared.
 
+## Why it persisted (important)
+
+Although the tool did not send `0x603/3`, the mode `01` value survived a normal
+power-off and battery removal. The camera most likely flushed the dirty BK4
+container on shutdown/reboot, or the write landed in the live store rather than
+a purely volatile buffer.
+
+Therefore:
+
+- “No save command” is **not** proof of “RAM-only.”
+- A hard reboot can **persist** the experimental value instead of discarding it.
+- The safe rollback order is: restore the pre-write snapshot, then **cold boot**
+  (battery out). In the observed recovery, `--persist` was **not** needed; save
+  the restored state only if `01` survives the cold boot.
+
+This is why the recovery path starts with a snapshot restore, not “just
+power-cycle it.” A cold boot after the restore cleared the loop; a cold boot on
+the experimental value did not.
+
 ## Why this is the expected result
 
 The BK4 property is the pixel-shift *value*, not the menu registration:
@@ -54,11 +92,14 @@ entry. This is consistent with the `PRM_FEATURE_MANAGER_menu_item` →
 
 ## Conclusion
 
-- The non-persistent write mechanism works exactly as intended: one byte,
-  checksum fixed, readback verified, no save.
-- The blocker is **menu registration / product-class gating**, not the value
-  property.
-- Do **not** persist this byte. It has no visible effect on this build.
+- The one-byte write and readback worked, but the **persistence assumption
+  failed**: the camera synced the dirty container even without `0x603/3`.
+- The menu blocker is **menu registration / product-class gating**, not the
+  value property.
+- Do **not** persist mode `01`. In the observed recovery, no `--persist` was
+  needed: a RAM-only snapshot restore followed by battery removal/cold boot was
+  sufficient. If `01` survives a cold boot, use Setting Reset or save the
+  restored snapshot.
 
 ## Next viable paths
 
@@ -77,11 +118,11 @@ entry. This is consistent with the `PRM_FEATURE_MANAGER_menu_item` →
    considered. A menu entry that is compiled out is not reachable by a setting
    byte.
 
-The current RAM-only change should be rolled back with a cold boot:
-
-1. Power off, disconnect USB.
-2. Remove the battery for at least 30 s.
-3. Reinsert, boot, reconnect, and run `--probe`; `0x02cf02ca` should be `00`.
+To roll back, restore the pre-write snapshot, then **cold boot** (battery out
+for at least 30 s). In the observed recovery, `--persist` was not needed. If
+`01` survives the cold boot, use **Setting Reset → Camera Settings Reset** or
+save the restored snapshot, then cold boot again. A hard reboot on the
+experimental value can persist it instead of clearing it.
 
 A detailed design and build plan for the remote path — transports, firmware
 hooks, unknown PTP codes to recover, phases, tool CLI, test matrix and stop

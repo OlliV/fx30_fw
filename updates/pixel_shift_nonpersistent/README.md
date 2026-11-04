@@ -1,11 +1,18 @@
 # Pixel Shift Multi Shoot — non-persistent probe (FX30 6.01)
 
-> **Boot loop reported after the first camera run: see [RECOVERY.md](RECOVERY.md)
-> before doing anything else. Stop writes; do not use `--persist`.**
+> **Boot loop after the first run; the camera is usable via an OSS lens +
+> Movie mode. The successful recovery used a RAM-only restore followed by
+> battery removal/cold boot. `--persist` was not used and was not necessary.
+> Before switching to Photo, verify `0x02cf02ca = 00` with a read-only
+> `--probe`; if it is `01`, clear it with a Setting Reset or a saved snapshot.**
 
 This package prepares a **session-only** test of the FX30 Pixel Shift Multi
-Shoot path. It writes one BK4 setting byte in RAM and deliberately does not
-persist it. A cold boot is the rollback.
+Shoot path. It writes one BK4 setting byte and does not send `0x603/3`
+(`save`). **However, “no save” is not a guarantee of non-persistence:** the
+camera can sync the dirty BK4 container on shutdown/reboot even when no save was
+requested (observed 2026-11-04). Do not cold-boot the experimental value.
+Restore the pre-write snapshot first, then cold boot. In the observed recovery,
+`--persist` was **not** needed; save the restored state only if `01` survives.
 
 It is an experiment, not a feature unlock. The shared Sony app still contains
 the product-class (`TYPE_MENU_ITEM_LAX`) gating that can hide the menu entry, so
@@ -49,9 +56,11 @@ The tool can optionally set the interval option as well:
   and the interval MR mirrors are 4-byte arrays, not single settings. They are
   left untouched.
 * **No firmware partitions.** Only the BK4 settings container is written.
-* **Nothing persistent by default.** The service call `0x603/4` changes the
-  in-memory container; `0x603/3` (`bk s` / `save`) is what writes it to storage.
-  This tool never sends `0x603/3` unless you explicitly pass `--persist`.
+* **The tool does not send `0x603/3` by default — but that is not proof of
+  non-persistence.** The service call `0x603/4` changes the live container;
+  `0x603/3` (`bk s` / `save`) is the explicit commit. The camera may still
+  flush a dirty container on shutdown/reboot, as observed on 2026-11-04.
+  Roll back by restoring the snapshot first, not by a cold boot.
 
 ## Why this is the right first probe
 
@@ -146,12 +155,25 @@ Follow [TEST_PLAN.md](TEST_PLAN.md). The key checks are whether the Drive Mode
 menu exposes Pixel Shift Multi Shoot, whether the camera accepts a 4-shot
 sequence, and whether the resulting files are grouped as a pixel-shift set.
 
-### 4. Cold-boot revert
+### 4. Rollback — restore, then cold boot
 
-Power off, disconnect USB, remove the battery for at least 30 s, reinsert, and
-run `--probe` again. `0x02cf02ca` should be back to `00`. If the behaviour
-persists after a cold boot, the write was not session-only on this firmware —
-stop and record that result before doing anything else.
+Do **not** cold-boot the experimental value. The camera can sync the dirty BK4
+container on shutdown/reboot even without `0x603/3`. Restore the pre-write
+snapshot first:
+
+```bash
+sudo -E ./venv/bin/python tools/fx30_pixel_shift.py \
+  --restore fx30_dump/pixel_shift_snapshot_XXXX.bin
+```
+
+Then do a **cold boot**: power off, disconnect USB, remove the battery for at
+least 30 s, reinsert, and power on. In the observed 2026-11-04 recovery, this
+was sufficient and **`--persist` was not used or needed**.
+
+After the cold boot, run `--probe`. `0x02cf02ca` should be `00`. If it survives
+as `01`, use **Setting Reset → Camera Settings Reset** or save the restored
+snapshot with `--persist --yes`, then cold boot again. Do not switch to Photo
+mode until it is `00`.
 
 ### 16-image variant
 
@@ -165,8 +187,10 @@ sudo -E ./venv/bin/python tools/fx30_pixel_shift.py --apply --mode 16 --interval
 sudo -E ./venv/bin/python tools/fx30_pixel_shift.py --restore fx30_dump/pixel_shift_snapshot_XXXX.bin
 ```
 
-This writes the snapshot back without saving. A cold boot is still the final
-rollback.
+This writes the snapshot back in RAM only. In the observed recovery, a RAM
+restore followed by battery removal/cold boot was sufficient; `--persist` was
+not used and was not needed. If `01` survives that cold boot, re-run with
+`--persist --yes` or use Setting Reset.
 
 ### Offline validation (no camera)
 
@@ -188,9 +212,10 @@ interval bytes alone.
   `TYPE_MENU_ITEM_LAX` for the product class. That is compile-time gating and
   cannot be changed by a BK4 byte.
 * If nothing changes until a reboot, the running model did not pick up the
-  in-memory container write. A cold boot will then discard it, so that variant
-  cannot be tested session-only. Record that result and move to the runtime
-  test-shooting/remote path rather than saving the byte.
+  in-memory container write. A cold boot may not discard it (the camera can sync
+  the dirty container), so that variant cannot be trusted as session-only.
+  Record that result and move to the runtime test-shooting/remote path rather
+  than saving the experimental byte.
 * `PRM_pixel_shift_multi_shoot_test_shooting_mode` is a runtime-only property
   with no `BKID_APP_*` record and no identified BK4 slot. The tool does not guess
   at it. `--list` prints the nearby BK4 range if you have independent evidence
@@ -204,8 +229,10 @@ interval bytes alone.
 
 * Research use only; warranty and bricking risk.
 * Back up the settings and keep the snapshots.
-* Do not pass `--persist` for the first test. It sends `0x603/3` and survives a
-  cold boot.
+* Do not pass `--persist` for the first test of mode `01`. In the observed
+  recovery, `--persist` was **not** needed: restore the snapshot, then cold
+  boot. Use it only if `01` survives that cold boot.
 * Do not interrupt USB power during a write.
-* If the camera behaves abnormally, power off, disconnect USB, remove the
-  battery for at least 30 s, and restore the snapshot in RAM before retrying.
+* If the camera behaves abnormally, stop writing. If service mode is reachable,
+  restore the snapshot, then cold boot; do not hard-reboot with an experimental
+  value active. If `01` survives, use Setting Reset or a saved snapshot.

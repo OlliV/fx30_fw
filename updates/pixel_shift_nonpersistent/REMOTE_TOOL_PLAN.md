@@ -46,7 +46,7 @@ PTP read-only probe: are pixel-shift commands/properties advertised?
    v
 set mode (4/16) -> read back -> arm/start -> capture events -> cancel
    v
-cold boot -> confirm off
+restore known-good state -> reboot -> confirm off
 ```
 
 ## 2. What the firmware already gives us
@@ -157,6 +157,9 @@ Safety requirements:
   `--status`, `--watch` and `--dry-run` do not.
 - A `--dry-run` prints the PTP command/ payload without sending.
 - No BK4 container read/write, no `0x603` calls, no firmware writes, no save.
+  But “no save” is **not** a guarantee of non-persistence on this body; the
+  FX30 may sync a dirty state on shutdown/reboot. Restore the known-good state
+  and verify it before rebooting (see [RECOVERY.md](RECOVERY.md)).
 - Log every command/response and every event to `fx30_dump/`.
 - On timeout/exception, send `--cancel` / set mode OFF if possible, then stop.
 
@@ -245,7 +248,7 @@ physical control and stop.
 | Test mode on | code known | readback = 1 | rejected |
 | Start | mode 4 armed | 4 frames / events | no frames or camera error |
 | Cancel | sequence/armed | idle, mode unchanged | stuck busy |
-| Cold boot | after cleanup | mode 0 | value survives |
+| Reboot | after restoring known-good state | mode 0 | value survives as 1 |
 
 ## 7. Risks and decision points
 
@@ -262,13 +265,15 @@ physical control and stop.
   codes without matching evidence in the FX30 binary.
 - **Warranty/bricking**: PC Remote property writes are lower risk than service
   adjustment writes but still experimental. No firmware patches.
+- **“No save” is not non-persistence**: the FX30 may sync a dirty state on
+  shutdown/reboot. Restore the known-good state and verify before rebooting.
 
 ## 8. Immediate next actions
 
 1. Quick sweep: check the **Fn menu** and the **Shooting menu** (not just Drive
    Mode) for a separate Pixel Shift item. If it exists, the remote tool may be
    unnecessary.
-2. Cold-boot and confirm `0x02cf02ca = 00`.
+2. Restore the known-good state first, then reboot and confirm `0x02cf02ca = 00`.
 3. If no menu item, do Phase 0 (offline code map); it needs no camera.
 4. Then Phase 1 (read-only PTP probe). Decide from the advertised codes, not
    from guesses.

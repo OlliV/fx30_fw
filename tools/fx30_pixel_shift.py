@@ -6,8 +6,12 @@ What this does
 --------------
 Reads the live BK4 settings container over the Sony service channel (0x603/5),
 patches only the pixel-shift backup property in memory (0x603/4), and verifies
-the readback.  It deliberately does **not** send 0x603/3 ("save"), so the change
-lives in RAM only and disappears on a cold boot.
+the readback.  It does **not** send 0x603/3 ("save") by default, but that is
+**not** a guarantee the camera will not persist the change: the FX30 can sync
+the dirty BK4 container on shutdown/reboot (observed 2026-11-04).  To roll back,
+restore the pre-write snapshot, then cold boot (battery out).  In the observed
+recovery, `--persist` was not needed; save the restored state only if `01`
+survives the cold boot.  Do not cold-boot the experimental value.
 
 Confirmed property IDs from the generated BKID name records in appFw.so
 (record layout: u32 id, u32 len, char* name):
@@ -47,14 +51,17 @@ Usage
 
 Safety model
 ------------
-* Non-persistent by default: no 0x603/3 save is sent unless --persist is given.
+* No 0x603/3 save is sent unless --persist is given.  That is **not** a
+  guarantee of non-persistence: the camera may sync the dirty BK4 container on
+  shutdown/reboot.  Roll back by restoring the snapshot, then cold boot; do not
+  cold-boot the experimental value.  Persist only if 01 survives.
 * Snapshot is written before any camera write and is checksum-validated.
 * Only BK4 settings are touched; firmware partitions are never written.
 * Readback is verified; on mismatch the pre-write image is written back in RAM.
 * --persist requires --yes and prints an explicit warning.
 
 Research use only.  Keep a backup, follow the test plan, and expect warranty and
-bricking risk.  A cold boot is the intended rollback.
+bricking risk.  A hard reboot can persist the experimental state.
 """
 from __future__ import annotations
 
@@ -382,7 +389,7 @@ def do_apply(s, args, plan: list[Edit]) -> int:
 
     print("\n  Write target : BK4 settings container")
     print("  Persistence  : %s" % ("PERSISTENT (0x603/3 save WILL be sent!)" if args.persist
-                                   else "NON-PERSISTENT (no save; cold boot reverts)"))
+                                   else "NO SAVE SENT (camera may still sync on shutdown)"))
     print("  Rollback     : %s" % snap.name)
     if args.dry_run:
         out = burst.DUMP / ("pixel_shift_dryrun_%s.bin" % time.strftime("%Y%m%d_%H%M%S"))
@@ -407,7 +414,7 @@ def do_apply(s, args, plan: list[Edit]) -> int:
         print("\n--- save (0x603/3) ---")
         s.save()
     else:
-        print("  (no 0x603/3 save sent; this is the non-persistent path)")
+        print("  (no 0x603/3 save sent; the camera may still sync on shutdown)")
     time.sleep(1.0)
 
     print("\n--- readback verification ---")
@@ -435,9 +442,9 @@ def do_apply(s, args, plan: list[Edit]) -> int:
                 print("  readback diff vs snapshot: %d byte(s) %s"
                       % (len(d), ", ".join("%#x" % i for i in d[:12])))
             else:
-                print("  restore failed; stop and power-cycle the camera")
+                print("  restore failed; stop and seek service recovery")
         except Exception as exc:
-            print("  restore failed: %r; stop and power-cycle the camera" % (exc,))
+            print("  restore failed: %r; stop and seek service recovery" % (exc,))
         return 4
 
     print("  all %d target byte(s) verified" % len(edits))
@@ -445,9 +452,11 @@ def do_apply(s, args, plan: list[Edit]) -> int:
     if args.persist:
         print("\nPersistent write complete. Cold boot will keep these values.")
     else:
-        print("\nSession-only write complete.")
-        print("Cold boot rollback: power off, disconnect USB, remove the battery for >=30 s,")
-        print("then restart and confirm the original values are back (--probe).")
+        print("\nWrite complete without 0x603/3.")
+        print("Do NOT cold-boot the experimental value: the camera may sync the")
+        print("dirty container on shutdown/reboot. Run --restore <snapshot>, then")
+        print("cold boot. In the observed recovery, --persist was not needed; save")
+        print("the restored state only if 01 survives.")
     return 0
 
 
@@ -475,6 +484,11 @@ def do_restore(s, args) -> int:
         print("Differences in counter/timestamp areas are normal; target bytes should match.")
     else:
         print("Readback matches the restore image byte-for-byte.")
+    if not args.persist:
+        print("This restore was RAM-only. In the observed recovery, a RAM")
+        print("restore followed by battery removal/cold boot was sufficient;")
+        print("--persist was not used. If 01 survives, use Setting Reset or")
+        print("re-run with --persist --yes.")
     return 0
 
 
